@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Laravel API Tester</title>
+    <style>
+        :root {
+            --bg: #0f172a; --card: #1e293b; --text: #e2e8f0;
+            --accent: #3b82f6; --success: #10b981; --danger: #ef4444;
+            --border: #334155; --code-bg: #0d1117;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 1.5rem; font-size: 1.8rem; }
+        .card {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;
+        }
+        h2 { margin-bottom: 0.75rem; font-size: 1.2rem; }
+        textarea {
+            width: 100%; background: var(--code-bg); color: #7ee787;
+            border: 1px solid var(--border); border-radius: 8px;
+            padding: 1rem; font-family: 'Fira Code', monospace;
+            font-size: 0.9rem; resize: vertical; margin-bottom: 1rem;
+        }
+        .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        button {
+            padding: 0.6rem 1.2rem; border: none; border-radius: 8px;
+            background: var(--accent); color: white; font-weight: 500;
+            cursor: pointer; transition: all 0.2s;
+        }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button.danger { background: var(--danger); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        pre {
+            background: var(--code-bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 1rem; overflow-x: auto;
+            font-size: 0.85rem; min-height: 60px; white-space: pre-wrap;
+        }
+        .status { font-size: 0.8rem; color: #94a3b8; margin-top: 0.5rem; }
+        .copy-btn {
+            position: relative; float: right; background: transparent;
+            border: 1px solid var(--border); padding: 0.3rem 0.6rem;
+            font-size: 0.75rem; margin: -1rem -0.5rem 0.5rem 0;
+        }
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            .btn-group { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Laravel API Tester</h1>
+        
+        <div class="card">
+            <h2>⚙️ Настройки</h2>
+            <label style="display:block; margin-bottom:0.5rem; font-size:0.9rem;">
+                🌐 Base URL (Laravel сервер):
+                <input type="text" id="baseUrl" value="http://127.0.0.1:8000" 
+                       style="width:100%; margin-top:0.3rem; padding:0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--code-bg); color:var(--text);">
+            </label>
+            <label style="display:block; font-size:0.9rem;">
+                📍 API Endpoint:
+                <input type="text" id="apiEndpoint" value="/api/users" 
+                       style="width:100%; margin-top:0.3rem; padding:0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--code-bg); color:var(--text);">
+            </label>
+        </div>
+
+        <div class="card">
+            <h2>📤 Отправить JSON (POST)</h2>
+            <textarea id="jsonInput" rows="6">{
+  "name": "Test User",
+  "email": "test@example.com",
+  "score": 95,
+  "tags": ["admin", "dev"],
+  "active": true
+}</textarea>
+            <button onclick="sendData()" id="btnPost">Отправить данные</button>
+            <div class="status" id="postStatus"></div>
+        </div>
+
+        <div class="card">
+            <h2>📥 Управление данными</h2>
+            <div class="btn-group">
+                <button onclick="fetchData()" id="btnGet">📂 Загрузить (GET)</button>
+                <button onclick="clearData()" id="btnDelete" class="danger">🗑 Очистить (DELETE)</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2>📋 Ответ сервера</h2>
+                <button class="copy-btn" onclick="copyResponse()">📋 Копировать</button>
+            </div>
+            <pre id="responseOutput">// Здесь появится ответ сервера...</pre>
+            <div class="status" id="responseStatus"></div>
+        </div>
+    </div>
+
+    <script>
+        // Функция получения полного URL
+        function getFullUrl() {
+            const baseUrl = document.getElementById('baseUrl').value.replace(/\/$/, '');
+            const endpoint = document.getElementById('apiEndpoint').value;
+            return baseUrl + endpoint;
+        }
+
+        const output = document.getElementById('responseOutput');
+        const responseStatus = document.getElementById('responseStatus');
+        const btnPost = document.getElementById('btnPost');
+        const btnGet = document.getElementById('btnGet');
+        const btnDelete = document.getElementById('btnDelete');
+        const postStatus = document.getElementById('postStatus');
+
+        function setLoading(loading) {
+            btnPost.disabled = loading;
+            btnGet.disabled = loading;
+            btnDelete.disabled = loading;
+        }
+
+        async function sendData() {
+            const input = document.getElementById('jsonInput');
+            setLoading(true);
+            postStatus.textContent = '⏳ Отправка...';
+            responseStatus.textContent = '';
+            output.textContent = '⏳ Обработка...';
+            
+            try {
+                const payload = JSON.parse(input.value);
+                
+                const res = await fetch(getFullUrl(), {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                // Читаем ответ даже если ошибка (для отладки)
+                const text = await res.text();
+                let data;
+                try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}\n\n${JSON.stringify(data, null, 2)}`);
+                }
+                
+                output.textContent = JSON.stringify(data, null, 2);
+                postStatus.textContent = '✅ Успешно сохранено!';
+                responseStatus.textContent = `Status: ${res.status} ${res.statusText}`;
+            } catch (err) {
+                output.textContent = '❌ Ошибка:\n' + err.message;
+                postStatus.textContent = '❌ Не удалось отправить';
+                responseStatus.textContent = '';
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function fetchData() {
+            setLoading(true);
+            responseStatus.textContent = '';
+            output.textContent = '⏳ Загрузка...';
+            
+            try {
+                const res = await fetch(getFullUrl(), {
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                const text = await res.text();
+                let data;
+                try { data = JSON.parse(text); } catch { data = { raw: text }; }
+                
+                if (!res.ok) throw new Error(`HTTP ${res.status}: ${JSON.stringify(data, null, 2)}`);
+                
+                output.textContent = JSON.stringify(data, null, 2);
+                responseStatus.textContent = `Status: ${res.status} ${res.statusText}`;
+            } catch (err) {
+                output.textContent = '❌ Ошибка получения:\n' + err.message;
+                responseStatus.textContent = '';
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function clearData() {
+            if (!confirm('Вы уверены? Все данные будут удалены.')) return;
+            setLoading(true);
+            responseStatus.textContent = '';
+            output.textContent = '⏳ Очистка...';
+            
+            try {
+                const res = await fetch(getFullUrl(), { 
+                    method: 'DELETE',
+                    headers: { 'Accept': 'application/json' }
+                });
+                const text = await res.text();
+                let data;
+                try { data = JSON.parse(text); } catch { data = { raw: text }; }
+                
+                if (!res.ok) throw new Error(`HTTP ${res.status}: ${JSON.stringify(data, null, 2)}`);
+                
+                output.textContent = JSON.stringify(data, null, 2);
+                responseStatus.textContent = `Status: ${res.status} ${res.statusText}`;
+            } catch (err) {
+                output.textContent = '❌ Ошибка очистки:\n' + err.message;
+                responseStatus.textContent = '';
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function copyResponse() {
+            navigator.clipboard.writeText(output.textContent).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const original = btn.textContent;
+                btn.textContent = '✅ Скопировано!';
+                setTimeout(() => btn.textContent = original, 1500);
+            });
+        }
+
+        // Автоформатирование JSON при потере фокуса
+        document.getElementById('jsonInput').addEventListener('blur', function() {
+            try { this.value = JSON.stringify(JSON.parse(this.value), null, 2); } catch (e) {}
+        });
+
+        // Проверка CORS при загрузке
+        window.addEventListener('load', async () => {
+            try {
+                await fetch(getFullUrl().replace(/\/[^/]*$/, '/test'), { method: 'GET' });
+            } catch (e) {
+                if (e.message.includes('Failed to fetch')) {
+                    responseStatus.innerHTML = '⚠️ <b>CORS ошибка?</b> Убедитесь, что в Laravel настроен config/cors.php';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
